@@ -243,7 +243,8 @@ def run_all_phases_comparison(
         return df
 
     df = df.sort_values("Confidence Score", ascending=False).reset_index(drop=True)
-    df.insert(0, "Rank", ["🥇", "🥈", "🥉"] + [""] * max(0, len(df) - 3))
+    medals = ["🥇", "🥈", "🥉"]
+    df.insert(0, "Rank", (medals + [""] * len(df))[:len(df)])   # works for 1, 2, 3 or more phases
 
     # Verdict column
     verdicts = []
