@@ -713,7 +713,7 @@ with tab_cif:
                             cif_text = cif_file.read().decode("utf-8", errors="ignore")
                             phase = load_cif(cif_text)
                             # Use filename as phase name (strip .cif)
-                            phase.name = cif_file.name.replace(".cif", "")
+                            phase.name = os.path.splitext(cif_file.name)[0]
                             st.session_state["cif_phases"][phase.name] = phase
                             loaded_names.append(f"{phase.name} ({len(phase.reflections)} reflections)")
                         except Exception as e:
@@ -725,16 +725,21 @@ with tab_cif:
                         st.error("❌ Failed to parse:\n" + "\n".join(errors))
 
         else:  # Select from Local ./cifs Directory
-            cif_dir = os.path.join(CURRENT_DIR, "cifs")
-            if os.path.exists(cif_dir):
-                cif_files = [f for f in os.listdir(cif_dir) if f.endswith(".cif")]
-            else:
-                cif_files = []
+            # Search the whole app folder (any sub-folder name, .cif or .CIF) so files committed to
+            # GitHub are found wherever they were placed. Paths are kept relative to the app folder.
+            cif_dir = CURRENT_DIR
+            cif_files = []
+            for _root, _dirs, _files in os.walk(CURRENT_DIR):
+                _dirs[:] = [d for d in _dirs if not d.startswith((".", "__")) and d not in ("venv", "node_modules", "site-packages")]
+                for _f in _files:
+                    if _f.lower().endswith(".cif"):
+                        cif_files.append(os.path.relpath(os.path.join(_root, _f), CURRENT_DIR))
+            cif_files.sort()
 
             if cif_files:
                 col_c1, col_c2 = st.columns([2, 1])
                 with col_c1:
-                    sel_local_cif = st.selectbox("Select CIF from local directory", cif_files)
+                    sel_local_cif = st.selectbox("Select CIF from the app folder (searched recursively)", cif_files)
                 with col_c2:
                     st.write("")
                     st.write("")
@@ -753,10 +758,14 @@ with tab_cif:
                         st.session_state["cif_phases"][ph.name] = ph
                         loaded_count += 1
                     if cif_files:
-                        st.session_state["selected_phase_name"] = os.path.basename(cif_files[0]).replace(".cif", "")
+                        st.session_state["selected_phase_name"] = os.path.splitext(os.path.basename(cif_files[0]))[0]
                     st.success(f"Successfully loaded all {loaded_count} CIF crystal structures into active library!")
             else:
-                st.warning("No .cif files found in local ./cifs folder.")
+                st.warning(
+                    "No .cif files found. Put them in a folder named `cifs` at the top level of your GitHub "
+                    "repository (next to app.py), commit, and reboot the app."
+                )
+                st.caption(f"Searched: {CURRENT_DIR}  |  top-level contents: " + ", ".join(sorted(os.listdir(CURRENT_DIR))[:30]))
 
         # Show currently loaded phases
         if st.session_state["cif_phases"]:
